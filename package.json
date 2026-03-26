@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "node ./src/index.mjs --config ./config.json",
-    "check": "node --check ./src/index.mjs"
+    "check": "for file in src/*.mjs test/*.mjs; do node --check \"$file\"; done",
+    "test": "node --test",
+    "smoke": "node --test ./test/smoke.test.mjs"
   },
   "engines": {
     "node": ">=18"

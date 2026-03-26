@@ -31,9 +31,10 @@ https://api.example.com/v1/chat/completions
 
 ## 前提
 
-- Linux
+- Linux 或 macOS
 - Node.js 18+
-- systemd
+- Linux 使用 `systemd`
+- macOS 使用 `launchd`
 - 有 `sudo` 权限
 
 ## 标准部署命令
@@ -56,21 +57,48 @@ sudo bash install.sh --upstream-url https://your-upstream-host
 sudo UPSTREAM_BASE_URL=https://your-upstream-host bash install.sh
 ```
 
+## 平台默认值
+
+### Linux
+
+- 安装目录：`/opt/octopus-upstream-http-bridge`
+- 配置文件：`/etc/octopus-upstream-http-bridge/config.json`
+- 服务管理器：`systemd`
+- 服务名：`octopus-upstream-http-bridge.service`
+
+### macOS
+
+- 安装目录：`/usr/local/lib/octopus-upstream-http-bridge`
+- 配置文件：`/usr/local/etc/octopus-upstream-http-bridge/config.json`
+- 服务管理器：`launchd`
+- label：`octopus-upstream-http-bridge`
+- plist：`/Library/LaunchDaemons/octopus-upstream-http-bridge.plist`
+- stdout 日志：`/var/log/octopus-upstream-http-bridge.log`
+- stderr 日志：`/var/log/octopus-upstream-http-bridge.error.log`
+
+macOS 上可以按 `brew services` 的习惯去理解，但底层不是 Homebrew formula，而是 `launchd`：
+
+- `brew services start ...` 对应 `sudo octopus-bridgectl start`
+- `brew services stop ...` 对应 `sudo octopus-bridgectl stop`
+- `brew services restart ...` 对应 `sudo octopus-bridgectl restart`
+- `brew services list` 对应 `sudo octopus-bridgectl status`
+
 ## 安装脚本会做什么
 
-- 复制项目到 `/opt/octopus-upstream-http-bridge`
-- 生成配置文件 `/etc/octopus-upstream-http-bridge/config.json`
-- 创建服务 `/etc/systemd/system/octopus-upstream-http-bridge.service`
+- 按当前系统选择默认安装目录和配置目录
+- 生成配置文件
+- Linux 创建 `systemd` 服务
+- macOS 创建 `launchd` plist
 - 启动服务
 - 设置开机自启
 
-## 默认值
+## 运行默认值
 
 - 监听地址：`127.0.0.1`
 - 监听端口：`8330`
 - bridge Base URL：`http://127.0.0.1:8330/v1`
 - 健康检查：`http://127.0.0.1:8330/health`
-- 服务名：`octopus-upstream-http-bridge.service`
+- 就绪检查：`http://127.0.0.1:8330/ready`
 - 最大请求体：`10MB`
 - 上游超时：`300000ms`
 - 运维命令：`/usr/local/bin/octopus-bridgectl`
@@ -80,7 +108,7 @@ sudo UPSTREAM_BASE_URL=https://your-upstream-host bash install.sh
 ### 1. 看服务状态
 
 ```bash
-systemctl status octopus-upstream-http-bridge.service --no-pager
+sudo octopus-bridgectl status
 ```
 
 预期：
@@ -104,7 +132,13 @@ curl http://127.0.0.1:8330/health
 ### 3. 看日志
 
 ```bash
-journalctl -u octopus-upstream-http-bridge.service -n 50 --no-pager
+sudo octopus-bridgectl logs 50
+```
+
+### 4. 看就绪探针
+
+```bash
+curl http://127.0.0.1:8330/ready
 ```
 
 ## Octopus 应该怎么填
@@ -134,6 +168,10 @@ NODE_BIN=/usr/bin/node
 LISTEN_HOST=127.0.0.1
 LISTEN_PORT=8330
 OPS_BIN_PATH=/usr/local/bin/octopus-bridgectl
+SERVICE_MANAGER=systemd|launchd
+LAUNCHD_PLIST_PATH=/Library/LaunchDaemons/octopus-upstream-http-bridge.plist
+STDOUT_LOG_PATH=/var/log/octopus-upstream-http-bridge.log
+STDERR_LOG_PATH=/var/log/octopus-upstream-http-bridge.error.log
 ```
 
 示例：
@@ -159,13 +197,13 @@ sudo UPSTREAM_BASE_URL=https://your-upstream-host LISTEN_PORT=18330 bash install
 重启：
 
 ```bash
-sudo systemctl restart octopus-upstream-http-bridge.service
+sudo octopus-bridgectl restart
 ```
 
 停止：
 
 ```bash
-sudo systemctl stop octopus-upstream-http-bridge.service
+sudo octopus-bridgectl stop
 ```
 
 实时日志：
@@ -188,6 +226,8 @@ sudo bash uninstall.sh
 sudo octopus-bridgectl summary
 sudo octopus-bridgectl status
 sudo octopus-bridgectl health
+sudo octopus-bridgectl ready
+sudo octopus-bridgectl doctor
 sudo octopus-bridgectl logs 100
 sudo octopus-bridgectl follow
 sudo octopus-bridgectl config-show
@@ -201,8 +241,8 @@ sudo octopus-bridgectl update
 如果健康检查不通，先检查：
 
 ```bash
-systemctl status octopus-upstream-http-bridge.service --no-pager
-journalctl -u octopus-upstream-http-bridge.service -n 100 --no-pager
+sudo octopus-bridgectl status
+sudo octopus-bridgectl logs 100
 ```
 
 如果健康检查通，但转发失败，重点检查：
@@ -226,8 +266,11 @@ default_host=127.0.0.1
 default_port=8330
 bridge_base_url=http://127.0.0.1:8330/v1
 health_url=http://127.0.0.1:8330/health
+ready_url=http://127.0.0.1:8330/ready
 service_name=octopus-upstream-http-bridge.service
-config_path=/etc/octopus-upstream-http-bridge/config.json
+launchd_label=octopus-upstream-http-bridge
+linux_config_path=/etc/octopus-upstream-http-bridge/config.json
+macos_config_path=/usr/local/etc/octopus-upstream-http-bridge/config.json
 ops_command=/usr/local/bin/octopus-bridgectl
 max_body_bytes_default=10485760
 upstream_timeout_ms_default=300000

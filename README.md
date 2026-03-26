@@ -32,9 +32,10 @@ Claude Code / OpenAI SDK / Anthropic SDK
 
 前提：
 
-- 机器是 Linux
+- 机器是 Linux 或 macOS
 - 已安装 Node.js 18+
-- 使用 `systemd`
+- Linux 使用 `systemd`
+- macOS 使用 `launchd`
 
 部署命令：
 
@@ -81,12 +82,15 @@ sudo octopus-bridgectl follow
 - 一键安装命令：`sudo bash install.sh https://your-upstream-host`
 - 也支持：`sudo UPSTREAM_BASE_URL=https://your-upstream-host bash install.sh`
 - 默认监听地址：`127.0.0.1:8330`
-- 默认配置文件：`/etc/octopus-upstream-http-bridge/config.json`
-- 默认服务名：`octopus-upstream-http-bridge.service`
+- Linux 默认配置文件：`/etc/octopus-upstream-http-bridge/config.json`
+- macOS 默认配置文件：`/usr/local/etc/octopus-upstream-http-bridge/config.json`
+- Linux 服务名：`octopus-upstream-http-bridge.service`
+- macOS launchd label：`octopus-upstream-http-bridge`
 - 上游地址必须以 `http://` 或 `https://` 开头
 - bridge 不保存上游 API key，只透传 `Authorization`
 - `Octopus` 应连接到：`http://127.0.0.1:8330/v1`
 - 安装后验证命令 1：`curl http://127.0.0.1:8330/health`
+- 安装后验证命令 1b：`curl http://127.0.0.1:8330/ready`
 - 安装后验证命令 2：`sudo octopus-bridgectl status`
 - 安装后验证命令 3：`sudo octopus-bridgectl logs 50`
 
@@ -97,8 +101,11 @@ sudo octopus-bridgectl follow
 - 支持 `Authorization` 透传
 - 支持请求体大小限制和上游超时保护
 - 支持优雅关停，减少服务重启时的异常请求
+- 已拆分为标准模块：配置、日志、代理、服务生命周期
+- 内置 `node:test` 测试与 GitHub Actions CI
 - 提供 `/health`
-- 附带 `systemd` 服务文件
+- 提供 `/ready`
+- 附带 `systemd` 与 `launchd` 服务化支持
 - 附带一键安装脚本，只需要提供上游 API 地址
 
 ## 适用场景
@@ -109,11 +116,59 @@ sudo octopus-bridgectl follow
 
 ## 运行要求
 
-- Linux
+- Linux 或 macOS
 - Node.js 18+
-- systemd
+- Linux 使用 `systemd`
+- macOS 使用 `launchd`
 
 ## 一键部署
+
+### Linux 默认值
+
+- 安装目录：`/opt/octopus-upstream-http-bridge`
+- 配置文件：`/etc/octopus-upstream-http-bridge/config.json`
+- 服务管理器：`systemd`
+- 服务名：`octopus-upstream-http-bridge.service`
+
+### macOS 默认值
+
+- 安装目录：`/usr/local/lib/octopus-upstream-http-bridge`
+- 配置文件：`/usr/local/etc/octopus-upstream-http-bridge/config.json`
+- 服务管理器：`launchd`
+- label：`octopus-upstream-http-bridge`
+- plist：`/Library/LaunchDaemons/octopus-upstream-http-bridge.plist`
+- stdout 日志：`/var/log/octopus-upstream-http-bridge.log`
+- stderr 日志：`/var/log/octopus-upstream-http-bridge.error.log`
+
+### macOS 的 `brew services` 风格说明
+
+这个项目现在不是 Homebrew formula，所以不能直接执行：
+
+```bash
+brew services start octopus-upstream-http-bridge
+```
+
+但使用体验可以按 `brew services` 去理解，因为底层同样是常驻系统服务。
+
+macOS 推荐把下面这些命令当成对应关系：
+
+- `brew services start ...` 对应 `sudo octopus-bridgectl start`
+- `brew services stop ...` 对应 `sudo octopus-bridgectl stop`
+- `brew services restart ...` 对应 `sudo octopus-bridgectl restart`
+- `brew services list` 对应 `sudo octopus-bridgectl status`
+- `tail -f` 看日志 对应 `sudo octopus-bridgectl follow`
+
+也就是说，在 macOS 上你可以把它理解成：
+
+```bash
+sudo bash install.sh https://your-upstream-host
+sudo octopus-bridgectl start
+sudo octopus-bridgectl stop
+sudo octopus-bridgectl restart
+sudo octopus-bridgectl status
+```
+
+只是底层不是 Homebrew，而是我们直接生成并管理 `launchd` plist。
 
 ### 方式 1：直接把上游地址写在命令后面
 
@@ -149,9 +204,10 @@ Upstream API base URL:
 
 ### 安装脚本会做什么
 
-- 把项目复制到 `/opt/octopus-upstream-http-bridge`
-- 生成配置文件 `/etc/octopus-upstream-http-bridge/config.json`
-- 写入 `systemd` 服务 `/etc/systemd/system/octopus-upstream-http-bridge.service`
+- 按当前系统选择默认安装目录和配置目录
+- 生成配置文件
+- Linux 写入 `systemd` 服务
+- macOS 写入 `launchd` plist
 - 自动启动服务
 - 设置为开机自启
 
@@ -159,6 +215,7 @@ Upstream API base URL:
 
 - bridge 本地地址：`http://127.0.0.1:8330/v1`
 - 健康检查地址：`http://127.0.0.1:8330/health`
+- 就绪检查地址：`http://127.0.0.1:8330/ready`
 - 运维命令：`/usr/local/bin/octopus-bridgectl`
 
 ### 可选环境变量
@@ -175,6 +232,10 @@ LISTEN_HOST=127.0.0.1
 LISTEN_PORT=8330
 OPS_BIN_PATH=/usr/local/bin/octopus-bridgectl
 FORCE_REWRITE_CONFIG=0
+SERVICE_MANAGER=systemd|launchd
+LAUNCHD_PLIST_PATH=/Library/LaunchDaemons/octopus-upstream-http-bridge.plist
+STDOUT_LOG_PATH=/var/log/octopus-upstream-http-bridge.log
+STDERR_LOG_PATH=/var/log/octopus-upstream-http-bridge.error.log
 ```
 
 例如：
@@ -247,6 +308,12 @@ curl http://127.0.0.1:8330/health
 {"ok":true,"service":"octopus-upstream-http-bridge","config":"config.json"}
 ```
 
+`/ready` 正常应该返回类似：
+
+```json
+{"ok":true,"service":"octopus-upstream-http-bridge","ready":true}
+```
+
 ### 6. 去 Octopus 后台配置渠道
 
 新增渠道时填写：
@@ -256,6 +323,14 @@ curl http://127.0.0.1:8330/health
 - API Key：你的真实上游 key
 
 这里最容易填错的是 Base URL。要填 bridge 地址，不是上游地址。
+
+### Linux 和 macOS 的区别
+
+- Linux 安装后服务由 `systemd` 管理
+- macOS 安装后服务由 `launchd` 管理
+- 两边都统一使用 `sudo octopus-bridgectl ...`
+- Linux 底层日志主要来自 `journalctl`
+- macOS 底层日志主要来自 `/var/log/octopus-upstream-http-bridge.log` 和 `/var/log/octopus-upstream-http-bridge.error.log`
 
 ## 手动运行
 
@@ -367,6 +442,29 @@ bridge 不保存这个 key，它只透传给上游。
 - 默认 `300000ms`，也就是 5 分钟
 - 超时会返回 `504`
 
+## 错误返回格式
+
+bridge 自身返回的错误统一是：
+
+```json
+{
+  "error": {
+    "code": "BRIDGE_XXX",
+    "message": "human readable message"
+  }
+}
+```
+
+当前常见错误码：
+
+- `BRIDGE_SHUTTING_DOWN`
+- `BRIDGE_NOT_FOUND`
+- `BRIDGE_MISSING_AUTH`
+- `BRIDGE_INVALID_BODY`
+- `BRIDGE_BODY_TOO_LARGE`
+- `BRIDGE_UPSTREAM_TIMEOUT`
+- `BRIDGE_UPSTREAM_FAILURE`
+
 ### `server`
 
 ```json
@@ -408,6 +506,18 @@ bridge 不保存这个 key，它只透传给上游。
 npm run check
 ```
 
+运行测试：
+
+```bash
+npm test
+```
+
+只跑 smoke test：
+
+```bash
+npm run smoke
+```
+
 安装为服务：
 
 ```bash
@@ -417,25 +527,37 @@ sudo bash install.sh https://your-upstream-host
 查看服务状态：
 
 ```bash
-systemctl status octopus-upstream-http-bridge.service --no-pager
+sudo octopus-bridgectl status
+```
+
+查看就绪状态：
+
+```bash
+sudo octopus-bridgectl ready
+```
+
+自动诊断：
+
+```bash
+sudo octopus-bridgectl doctor
 ```
 
 查看服务日志：
 
 ```bash
-journalctl -u octopus-upstream-http-bridge.service -f
+sudo octopus-bridgectl follow
 ```
 
 重启服务：
 
 ```bash
-sudo systemctl restart octopus-upstream-http-bridge.service
+sudo octopus-bridgectl restart
 ```
 
 停止服务：
 
 ```bash
-sudo systemctl stop octopus-upstream-http-bridge.service
+sudo octopus-bridgectl stop
 ```
 
 卸载服务：
@@ -497,7 +619,7 @@ http://127.0.0.1:8330/v1
 先看日志：
 
 ```bash
-journalctl -u octopus-upstream-http-bridge.service -n 100 --no-pager
+sudo octopus-bridgectl logs 100
 ```
 
 重点排查：
@@ -522,6 +644,8 @@ sudo octopus-bridgectl
 - `sudo octopus-bridgectl summary`：查看服务、配置、bridge 地址
 - `sudo octopus-bridgectl status`：查看服务状态
 - `sudo octopus-bridgectl health`：请求本地健康接口
+- `sudo octopus-bridgectl ready`：请求本地就绪接口
+- `sudo octopus-bridgectl doctor`：自动检查服务、配置、探针和最近错误日志
 - `sudo octopus-bridgectl logs 100`：查看最近 100 行日志
 - `sudo octopus-bridgectl follow`：实时追日志
 - `sudo octopus-bridgectl restart`：重启服务
@@ -536,15 +660,37 @@ sudo octopus-bridgectl
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── LICENSE
+├── launchd/
+│   └── octopus-upstream-http-bridge.plist
 ├── config.example.json
+├── DEPLOYMENT.md
 ├── install.sh
-├── uninstall.sh
+├── ops.sh
 ├── package.json
 ├── README.md
+├── scripts/
+│   ├── install.sh
+│   ├── ops.sh
+│   └── uninstall.sh
 ├── src/
-│   └── index.mjs
-└── systemd/
-    └── octopus-upstream-http-bridge.service
+│   ├── config.mjs
+│   ├── constants.mjs
+│   ├── errors.mjs
+│   ├── index.mjs
+│   ├── logger.mjs
+│   ├── proxy.mjs
+│   └── server.mjs
+├── test/
+│   ├── config.test.mjs
+│   ├── proxy.test.mjs
+│   └── smoke.test.mjs
+├── systemd/
+│   └── octopus-upstream-http-bridge.service
+└── uninstall.sh
 ```
 
 ## 开源建议
