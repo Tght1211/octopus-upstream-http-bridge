@@ -1,0 +1,29 @@
+{
+  "listen": {
+    "host": "127.0.0.1",
+    "port": 8330
+  },
+  "upstream": {
+    "base_url": "http://154.12.94.222:8080"
+  },
+  "proxy": {
+    "require_authorization": true,
+    "strip_request_headers": [
+      "host",
+      "content-length",
+      "connection",
+      "keep-alive",
+      "transfer-encoding",
+      "accept-encoding"
+    ],
+    "strip_response_headers": [
+      "content-length",
+      "connection",
+      "transfer-encoding",
+      "content-encoding"
+    ]
+  },
+  "model_map": {
+    "claude-sonnet-4-6": "gpt-5.4"
+  }
+}

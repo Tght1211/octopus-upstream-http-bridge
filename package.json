@@ -1,0 +1,27 @@
+{
+  "name": "octopus-upstream-http-bridge",
+  "version": "0.1.0",
+  "description": "A minimal Node.js bridge for Octopus to proxy OpenAI-compatible upstream APIs with auth passthrough.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "octopus-upstream-http-bridge": "./src/index.mjs"
+  },
+  "scripts": {
+    "start": "node ./src/index.mjs --config ./config.json",
+    "check": "node --check ./src/index.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "octopus",
+    "proxy",
+    "bridge",
+    "openai",
+    "anthropic",
+    "nodejs"
+  ],
+  "author": "tght",
+  "license": "MIT"
+}

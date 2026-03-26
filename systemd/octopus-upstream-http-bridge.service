@@ -1,0 +1,15 @@
+[Unit]
+Description=Octopus Upstream HTTP Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/octopus-upstream-http-bridge
+ExecStart=/usr/bin/node /opt/octopus-upstream-http-bridge/src/index.mjs --config /etc/octopus-upstream-http-bridge/config.json
+Restart=always
+RestartSec=2
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
