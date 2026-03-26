@@ -4,7 +4,7 @@
     "port": 8330
   },
   "upstream": {
-    "base_url": "http://154.12.94.222:8080"
+    "base_url": "https://your-upstream-host"
   },
   "proxy": {
     "require_authorization": true,
@@ -22,8 +22,5 @@
       "transfer-encoding",
       "content-encoding"
     ]
-  },
-  "model_map": {
-    "claude-sonnet-4-6": "gpt-5.4"
   }
 }

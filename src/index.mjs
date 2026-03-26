@@ -58,7 +58,6 @@ function readConfig(configPath) {
     requireAuthorization: config?.proxy?.require_authorization !== false,
     requestHeaderStripSet: new Set((config?.proxy?.strip_request_headers || []).map((item) => String(item).toLowerCase())),
     responseHeaderStripSet: new Set((config?.proxy?.strip_response_headers || []).map((item) => String(item).toLowerCase())),
-    modelMap: new Map(Object.entries(config?.model_map || {})),
   };
 }
 
@@ -84,14 +83,6 @@ function normalizePath(inputPath) {
   if (inputPath.startsWith('/v1/')) return inputPath;
   if (inputPath === '/v1') return '/v1';
   return `/v1${inputPath}`;
-}
-
-function maybeRewriteModel(jsonBody, modelMap) {
-  if (!jsonBody || typeof jsonBody !== 'object') return jsonBody;
-  if (typeof jsonBody.model === 'string' && modelMap.has(jsonBody.model)) {
-    jsonBody.model = modelMap.get(jsonBody.model);
-  }
-  return jsonBody;
 }
 
 function writeJson(res, statusCode, payload) {
@@ -131,9 +122,8 @@ async function start() {
       const bodyBuffer = await collectBody(req);
       const contentType = String(req.headers['content-type'] || '');
       if (bodyBuffer.length > 0 && contentType.includes('application/json')) {
-        const jsonBody = JSON.parse(bodyBuffer.toString('utf8'));
-        maybeRewriteModel(jsonBody, cfg.modelMap);
-        outgoingBody = JSON.stringify(jsonBody);
+        JSON.parse(bodyBuffer.toString('utf8'));
+        outgoingBody = bodyBuffer.toString('utf8');
       } else if (bodyBuffer.length > 0) {
         outgoingBody = bodyBuffer;
       }
