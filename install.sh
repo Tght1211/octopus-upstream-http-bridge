@@ -9,6 +9,9 @@ NODE_BIN="${NODE_BIN:-$(command -v node)}"
 LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
 LISTEN_PORT="${LISTEN_PORT:-8330}"
 UPSTREAM_BASE_URL="${UPSTREAM_BASE_URL:-}"
+OPS_BIN_PATH="${OPS_BIN_PATH:-/usr/local/bin/octopus-bridgectl}"
+METADATA_PATH="${METADATA_PATH:-/etc/octopus-upstream-http-bridge/install.env}"
+FORCE_REWRITE_CONFIG="${FORCE_REWRITE_CONFIG:-0}"
 
 usage() {
   cat <<'EOF'
@@ -24,6 +27,8 @@ Optional env:
   NODE_BIN=/usr/bin/node
   LISTEN_HOST=127.0.0.1
   LISTEN_PORT=8330
+  OPS_BIN_PATH=/usr/local/bin/octopus-bridgectl
+  FORCE_REWRITE_CONFIG=0
 EOF
 }
 
@@ -80,7 +85,9 @@ fi
 
 mkdir -p "${INSTALL_DIR}" "$(dirname "${CONFIG_PATH}")"
 cp -a "${REPO_DIR}/." "${INSTALL_DIR}/"
+chmod +x "${INSTALL_DIR}/install.sh" "${INSTALL_DIR}/uninstall.sh" "${INSTALL_DIR}/ops.sh"
 
+if [[ ! -f "${CONFIG_PATH}" || "${FORCE_REWRITE_CONFIG}" == "1" ]]; then
 cat > "${CONFIG_PATH}" <<EOF
 {
   "listen": {
@@ -92,6 +99,8 @@ cat > "${CONFIG_PATH}" <<EOF
   },
   "proxy": {
     "require_authorization": true,
+    "max_body_bytes": 10485760,
+    "upstream_timeout_ms": 300000,
     "strip_request_headers": [
       "host",
       "content-length",
@@ -106,9 +115,30 @@ cat > "${CONFIG_PATH}" <<EOF
       "transfer-encoding",
       "content-encoding"
     ]
+  },
+  "server": {
+    "headers_timeout_ms": 65000,
+    "request_timeout_ms": 300000,
+    "keep_alive_timeout_ms": 5000,
+    "shutdown_timeout_ms": 15000
   }
 }
 EOF
+  CONFIG_ACTION="generated"
+else
+  CONFIG_ACTION="preserved"
+fi
+
+cat > "${METADATA_PATH}" <<EOF
+INSTALL_DIR="${INSTALL_DIR}"
+CONFIG_PATH="${CONFIG_PATH}"
+SERVICE_NAME="${SERVICE_NAME}"
+LISTEN_HOST="${LISTEN_HOST}"
+LISTEN_PORT="${LISTEN_PORT}"
+METADATA_PATH="${METADATA_PATH}"
+EOF
+
+install -m 0755 "${INSTALL_DIR}/ops.sh" "${OPS_BIN_PATH}"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
@@ -133,6 +163,12 @@ systemctl enable --now "${SERVICE_NAME}.service"
 
 echo "Installed to ${INSTALL_DIR}"
 echo "Config: ${CONFIG_PATH}"
+echo "Config Action: ${CONFIG_ACTION}"
 echo "Service: ${SERVICE_NAME}.service"
 echo "Upstream: ${UPSTREAM_BASE_URL}"
 echo "Bridge URL: http://${LISTEN_HOST}:${LISTEN_PORT}/v1"
+echo "Ops Command: ${OPS_BIN_PATH}"
+echo "Try:"
+echo "  sudo $(basename "${OPS_BIN_PATH}") status"
+echo "  sudo $(basename "${OPS_BIN_PATH}") logs 100"
+echo "  sudo $(basename "${OPS_BIN_PATH}") config-show"

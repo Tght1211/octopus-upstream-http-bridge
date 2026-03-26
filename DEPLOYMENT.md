@@ -73,6 +73,7 @@ sudo UPSTREAM_BASE_URL=https://your-upstream-host bash install.sh
 - 服务名：`octopus-upstream-http-bridge.service`
 - 最大请求体：`10MB`
 - 上游超时：`300000ms`
+- 运维命令：`/usr/local/bin/octopus-bridgectl`
 
 ## 安装后验证
 
@@ -132,6 +133,7 @@ SERVICE_NAME=octopus-upstream-http-bridge
 NODE_BIN=/usr/bin/node
 LISTEN_HOST=127.0.0.1
 LISTEN_PORT=8330
+OPS_BIN_PATH=/usr/local/bin/octopus-bridgectl
 ```
 
 示例：
@@ -141,6 +143,7 @@ sudo UPSTREAM_BASE_URL=https://your-upstream-host LISTEN_PORT=18330 bash install
 ```
 
 如果修改了端口，`Octopus` 里的 Base URL 也要一起改。
+重新执行安装或 `octopus-bridgectl update` 时，默认会保留现有配置文件。
 
 更细的稳定性参数要在配置文件里改，例如：
 
@@ -168,13 +171,29 @@ sudo systemctl stop octopus-upstream-http-bridge.service
 实时日志：
 
 ```bash
-journalctl -u octopus-upstream-http-bridge.service -f
+sudo octopus-bridgectl follow
 ```
 
 卸载服务：
 
 ```bash
 sudo bash uninstall.sh
+```
+
+## 运维命令
+
+安装后可直接使用：
+
+```bash
+sudo octopus-bridgectl summary
+sudo octopus-bridgectl status
+sudo octopus-bridgectl health
+sudo octopus-bridgectl logs 100
+sudo octopus-bridgectl follow
+sudo octopus-bridgectl config-show
+sudo octopus-bridgectl config-edit
+sudo octopus-bridgectl restart
+sudo octopus-bridgectl update
 ```
 
 ## 快速排障
@@ -209,6 +228,7 @@ bridge_base_url=http://127.0.0.1:8330/v1
 health_url=http://127.0.0.1:8330/health
 service_name=octopus-upstream-http-bridge.service
 config_path=/etc/octopus-upstream-http-bridge/config.json
+ops_command=/usr/local/bin/octopus-bridgectl
 max_body_bytes_default=10485760
 upstream_timeout_ms_default=300000
 octopus_channel_type=OpenAI Chat

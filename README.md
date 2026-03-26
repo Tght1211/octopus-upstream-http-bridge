@@ -69,7 +69,7 @@ curl http://127.0.0.1:8330/health
 查看日志：
 
 ```bash
-journalctl -u octopus-upstream-http-bridge.service -f
+sudo octopus-bridgectl follow
 ```
 
 ## 给 AI/自动化看的最短说明
@@ -87,8 +87,8 @@ journalctl -u octopus-upstream-http-bridge.service -f
 - bridge 不保存上游 API key，只透传 `Authorization`
 - `Octopus` 应连接到：`http://127.0.0.1:8330/v1`
 - 安装后验证命令 1：`curl http://127.0.0.1:8330/health`
-- 安装后验证命令 2：`systemctl status octopus-upstream-http-bridge.service`
-- 安装后验证命令 3：`journalctl -u octopus-upstream-http-bridge.service -n 50 --no-pager`
+- 安装后验证命令 2：`sudo octopus-bridgectl status`
+- 安装后验证命令 3：`sudo octopus-bridgectl logs 50`
 
 ## 特性
 
@@ -159,6 +159,7 @@ Upstream API base URL:
 
 - bridge 本地地址：`http://127.0.0.1:8330/v1`
 - 健康检查地址：`http://127.0.0.1:8330/health`
+- 运维命令：`/usr/local/bin/octopus-bridgectl`
 
 ### 可选环境变量
 
@@ -172,6 +173,8 @@ SERVICE_NAME=octopus-upstream-http-bridge
 NODE_BIN=/usr/bin/node
 LISTEN_HOST=127.0.0.1
 LISTEN_PORT=8330
+OPS_BIN_PATH=/usr/local/bin/octopus-bridgectl
+FORCE_REWRITE_CONFIG=0
 ```
 
 例如：
@@ -179,6 +182,11 @@ LISTEN_PORT=8330
 ```bash
 sudo UPSTREAM_BASE_URL=https://your-upstream-host LISTEN_PORT=18330 bash install.sh
 ```
+
+说明：
+
+- 默认会保留已有 `config.json`
+- 只有在首次安装或显式设置 `FORCE_REWRITE_CONFIG=1` 时才会重写配置
 
 ## 小白部署步骤
 
@@ -220,6 +228,12 @@ systemctl status octopus-upstream-http-bridge.service --no-pager
 ```
 
 看到 `active (running)` 基本就表示成功。
+
+也可以直接用：
+
+```bash
+sudo octopus-bridgectl status
+```
 
 ### 5. 检查健康接口
 
@@ -494,6 +508,29 @@ journalctl -u octopus-upstream-http-bridge.service -n 100 --no-pager
 - 请求体是否超过 `max_body_bytes`
 - 上游是否超时
 - 上游是否本身就返回了错误
+
+## 运维命令
+
+安装完成后会自动生成命令：
+
+```bash
+sudo octopus-bridgectl
+```
+
+常用子命令：
+
+- `sudo octopus-bridgectl summary`：查看服务、配置、bridge 地址
+- `sudo octopus-bridgectl status`：查看服务状态
+- `sudo octopus-bridgectl health`：请求本地健康接口
+- `sudo octopus-bridgectl logs 100`：查看最近 100 行日志
+- `sudo octopus-bridgectl follow`：实时追日志
+- `sudo octopus-bridgectl restart`：重启服务
+- `sudo octopus-bridgectl start`：启动服务
+- `sudo octopus-bridgectl stop`：停止服务
+- `sudo octopus-bridgectl config-path`：显示配置文件路径
+- `sudo octopus-bridgectl config-show`：显示当前配置
+- `sudo octopus-bridgectl config-edit`：用 `$EDITOR` 编辑配置
+- `sudo octopus-bridgectl update`：保留当前配置，重新安装并重启服务
 
 ## 目录结构
 
